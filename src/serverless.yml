@@ -1,0 +1,50 @@
+service: city-reveal
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${sls:stage}
+  region: us-east-1
+  httpApi:
+    cors: true
+  iamRoleStatements:
+    # Access to s3 bucket with secrets
+    - Effect: 'Allow'
+      Action:
+        - 's3:ListBucket'
+      Resource: 'arn:aws:s3:::${param:s3_bucket}'
+    - Effect: 'Allow'
+      Action:
+        - 's3:GetObject'
+      Resource: 'arn:aws:s3:::${param:s3_bucket}/secrets/${sls:stage}.json'
+    # Prefer to access secrets from secretsmanager instead of s3, but that requires
+    # running in the VPC, which requires a NAT gateway for regular internet traffic,
+    # and that is too expensive for a personal project.
+#    - Effect: 'Allow'
+#      Action:
+#        - 'secretsmanager:GetSecretValue'
+#      Resource: 'arn:aws:secretsmanager:${aws:region}:${aws:accountId}:secret:city-reveal/${sls:stage}.json*'
+  environment:
+    ENVIRONMENT: ${sls:stage}
+    NODE_ENV: production
+#  vpc:
+#    securityGroupIds:
+#      # default for VPC
+#      - '${param:vpc_sg}'
+#    subnetIds:
+#      # private lambda subnet
+#      - '${param:subnet_id}'
+
+	
+package:
+  patterns:
+    - '!client/**'
+
+functions:
+  app:
+    handler: lambda_server.handler
+    timeout: 15
+    events:
+      - httpApi:
+          path: '*'
+          method: '*'
